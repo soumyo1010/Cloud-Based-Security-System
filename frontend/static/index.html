@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud-Based Security System</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #e3f2fd; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            margin: 0;
+        }
+        .container {
+            background: #ffffff;
+            padding: 30px; 
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            width: 100%;
+            max-width: 450px;
+            max-height: 90vh; /* Limit container height */
+            overflow-y: auto; /* Add scrollbar if content overflows */
+        }
+        h1, h2 { 
+            text-align: center; 
+            color: #1565c0; 
+            margin: 10px 0; /* Add spacing */
+        }
+        input[type="text"],
+        input[type="password"],
+        input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #64b5f6;
+            border-radius: 6px;
+            margin-bottom: 20px; /* Increased spacing */
+            font-size: 16px; /* Larger font size */
+            box-sizing: border-box; /* Ensure padding doesn't affect width */
+        }
+        button {
+            width: 100%;
+            background-color: #1565c0;
+            color: #fff;
+            border: none;
+            padding: 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            font-size: 16px; /* Larger font size */
+            font-weight: bold; /* Bold text */
+        }
+        button:hover { background-color: #0d47a1; }
+        ul { 
+            list-style: none; 
+            padding: 0; 
+            margin: 0; /* Remove default margin */
+        }
+        li {
+            background: #e3f2fd;
+            margin: 5px 0;
+            padding: 8px 12px;
+            border-radius: 8px;
+        }
+        a { color: #1e88e5; text-decoration: none; font-weight: bold; }
+        a:hover { text-decoration: underline; }
+
+        /* Scrollable sections for video list and logs */
+        .scrollable {
+            max-height: 150px; /* Limit height */
+            overflow-y: auto; /* Add scrollbar */
+            margin-bottom: 20px; /* Add spacing */
+            border: 1px solid #ddd; /* Add border */
+            border-radius: 8px; /* Rounded corners */
+            padding: 10px; /* Add padding */
+        }
+
+        /* Notification Popup Styling */
+        .popup {
+            visibility: hidden;
+            background-color: #4CAF50;
+            color: white;
+            text-align: center;
+            border-radius: 8px;
+            padding: 16px;
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+        .popup.show { visibility: visible; }
+
+        /* Hide main page initially */
+        #mainPage { display: none; }
+
+        /* Login Page Specific Styling */
+        #loginPage input[type="text"],
+        #loginPage input[type="password"] {
+            margin-bottom: 25px; /* More spacing for login inputs */
+        }
+        #loginPage button {
+            margin-top: 10px; /* Spacing above the login button */
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Page -->
+    <div id="loginPage" class="container">
+        <h1>Login</h1>
+        <form id="loginForm">
+            <input type="text" id="loginUsername" placeholder="Username" required>
+            <input type="password" id="loginPassword" placeholder="Password" required>
+            <button type="submit">Login</button>
+        </form>
+    </div>
+
+    <!-- Main Page -->
+    <div id="mainPage" class="container">
+        <h1>Cloud-Based Security System</h1>
+
+        <!-- Video Upload Form -->
+        <form id="uploadForm" enctype="multipart/form-data">
+            <input type="file" id="videoFile" required>
+            <button type="submit">Upload Video</button>
+        </form>
+
+        <!-- Video List -->
+        <h2>Video List</h2>
+        <div class="scrollable">
+            <ul id="videoList"></ul>
+        </div>
+
+        <!-- Logs List -->
+        <h2>Logs</h2>
+        <div class="scrollable">
+            <ul id="logsList"></ul>
+        </div>
+
+        <!-- Popup Notification -->
+        <div id="popup" class="popup">Video uploaded successfully!</div>
+    </div>
+
+    <script>
+        function showPopup(message, success = true) {
+            const popup = document.getElementById('popup');
+            popup.textContent = message;
+            popup.style.backgroundColor = success ? '#4CAF50' : '#f44336';
+            popup.classList.add('show');
+            setTimeout(() => popup.classList.remove('show'), 3000);
+        }
+
+        // Handle Login
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+
+            try {
+                const response = await fetch('http://localhost:5000/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (response.ok) {
+                    // Hide login page and show main page
+                    document.getElementById('loginPage').style.display = 'none';
+                    document.getElementById('mainPage').style.display = 'block';
+                    loadVideos();
+                    loadLogs();
+                } else {
+                    showPopup('❌ Invalid username or password.', false);
+                }
+            } catch (error) {
+                console.error('Error during login:', error);
+                showPopup('❌ Error during login. Try again.', false);
+            }
+        });
+
+        // Handle Video Upload
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fileInput = document.getElementById('videoFile');
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const response = await fetch('http://localhost:5000/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    showPopup('🎉 Video uploaded successfully!');
+                    loadVideos();
+                    loadLogs();
+                } else {
+                    showPopup('❌ Upload failed! Please try again.', false);
+                }
+            } catch (error) {
+                console.error('Error uploading video:', error);
+                showPopup('❌ Error uploading video. Try again.', false);
+            }
+        });
+
+        // Fetch and display videos (only first 4)
+        async function loadVideos() {
+            const videoList = document.getElementById('videoList');
+            videoList.innerHTML = '';
+
+            try {
+                const response = await fetch('http://localhost:5000/videos');
+                const videos = await response.json();
+
+                if (videos.length === 0) {
+                    videoList.innerHTML = '<li>No videos uploaded yet.</li>';
+                } else {
+                    videos.slice(0, 4).forEach(video => { // Show only first 4 videos
+                        const listItem = document.createElement('li');
+                        listItem.innerHTML = `${video.file_name} - <a href="http://localhost:5000/download/${video.file_name}" target="_blank">Download</a>`;
+                        videoList.appendChild(listItem);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading videos:', error);
+                showPopup('❌ Error loading video list.', false);
+            }
+        }
+
+        // Fetch and display logs (only first 4)
+        async function loadLogs() {
+            const logsList = document.getElementById('logsList');
+            logsList.innerHTML = '';
+
+            try {
+                const response = await fetch('http://localhost:5000/logs');
+                const logs = await response.json();
+
+                if (logs.length === 0) {
+                    logsList.innerHTML = '<li>No logs available.</li>';
+                } else {
+                    logs.slice(0, 4).forEach(log => { // Show only first 4 logs
+                        const listItem = document.createElement('li');
+                        listItem.innerHTML = `${log.event_type}: ${log.description} (${log.timestamp})`;
+                        logsList.appendChild(listItem);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading logs:', error);
+                showPopup('❌ Error loading logs.', false);
+            }
+        }
+    </script>
+</body>
+</html>
